@@ -1,5 +1,4 @@
-import {GetItemHeight, HandleScroll} from "./types";
-import {MutableRefObject} from "react";
+import {GetItemHeight, HandleScroll, ItemStyles, VirtualListData} from "./types";
 
 export const rafThrottle = (cb: any) => {
   let isWait = false;
@@ -26,19 +25,22 @@ export const getInnerStyles = (listHeight: number) => ({
   height: listHeight,
 });
 
-export const getItemWrapperStyle = <T,>(item: T, data: T[], idx: number, getItemHeight: (item: T, data: T[]) => number ) => ({
+export const getItemWrapperStyle = (
+ itemStyle: { top: number; height: number }
+) => ({
+  ...itemStyle,
   position: "absolute",
   width: "100%",
   left: 0,
-  top: idx * getItemHeight(item, data),
 });
 
-export const getStartIndexUtil = <T,>(
+export const getStartIndex = <T,>(
+  scrollTop: number,
   frameHeight: number,
   overScanCount: number,
   data: T[],
-  getItemHeight: GetItemHeight<T>
-) => (scrollTop: number) => {
+  itemsStyles: ItemStyles[]
+) => {
   const freeHeight = scrollTop - frameHeight * overScanCount;
 
   if (freeHeight <= 0) {
@@ -47,7 +49,7 @@ export const getStartIndexUtil = <T,>(
 
   let itemsHeight = 0;
   for (let i = 0; i < data.length; i++) {
-    itemsHeight += getItemHeight(data[i], data);
+    itemsHeight += itemsStyles[i].height;
     if (itemsHeight >= freeHeight) {
       return i;
     }
@@ -56,16 +58,17 @@ export const getStartIndexUtil = <T,>(
   return 0;
 };
 
-export const getEndIndexUtil = <T,>(
+export const getEndIndex = <T,>(
+  scrollTop: number,
   frameHeight: number,
   overScanCount: number,
   data: T[],
-  getItemHeight: GetItemHeight<T>
-) => (scrollTop: number) => {
+  itemsStyles: ItemStyles[]
+) => {
   const heightToCover = scrollTop + frameHeight + frameHeight * overScanCount;
   let itemsHeight = 0;
   for (let i = 0; i < data.length; i++) {
-    itemsHeight += getItemHeight(data[i], data);
+    itemsHeight += itemsStyles[i].height;
     if (itemsHeight >= heightToCover) {
       return i + 1;
     }
@@ -73,12 +76,42 @@ export const getEndIndexUtil = <T,>(
   return data.length;
 };
 
-const handleScroll: HandleScroll = (scrollTopRef, scrolledElRef, setCutIndexes) => {
+export const handleScroll: HandleScroll = (
+  scrollTopRef,
+  scrolledElRef,
+  setCutIndexes,
+  onScroll
+) => {
   if (!scrolledElRef.current) {
     return;
   }
-  const { scrollTop } = scrolledElRef.current;
+  const { scrollTop, scrollHeight } = scrolledElRef.current;
   scrollTopRef.current = scrollTop;
   setCutIndexes(scrollTop);
+  if (onScroll) {
+    onScroll(scrollTop, scrollHeight);
+  }
 }
+
 export const throttledScrollHandler = rafThrottle(handleScroll);
+
+export const getVirtualListData = <T,>(data: T[], getItemHeight: GetItemHeight<T>) => data.reduce<VirtualListData>(
+  (acc, item, index) => {
+    if (index === 0) {
+      const itemHeight = getItemHeight(item, data);
+      acc.itemsStyles.push({ height: itemHeight, top: 0 });
+      acc.listHeight += itemHeight;
+      return acc;
+    }
+
+    const prevItem = acc.itemsStyles[index - 1];
+    const itemHeight = getItemHeight(item, data);
+    acc.itemsStyles.push({
+      height: itemHeight,
+      top: prevItem.top + prevItem.height
+    });
+    acc.listHeight += itemHeight;
+    return acc;
+  },
+  { itemsStyles: [], listHeight: 0 }
+);
