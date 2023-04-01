@@ -1,4 +1,9 @@
-import {GetItemHeight, HandleScroll, ItemStyles, VirtualListData} from "./types";
+// Copyright © 2022 EPAM Systems, Inc.
+// All Rights Reserved.
+// All information contained herein is, and remains the property of EPAM Systems, Inc. and/or its suppliers and is protected by international intellectual property law.
+// Dissemination of this information or reproduction of this material is strictly forbidden, unless prior written permission is obtained from EPAM Systems, Inc.
+
+import { GetItemHeight, HandleScroll, ItemStyles, VirtualListData } from "./types";
 
 export const rafThrottle = (cb: any) => {
   let isWait = false;
@@ -10,9 +15,9 @@ export const rafThrottle = (cb: any) => {
     requestAnimationFrame(() => {
       cb(...args);
       isWait = false;
-    })
-  }
-}
+    });
+  };
+};
 
 export const getWrapperStyles = (wrapperHeight: number) => ({
   position: "relative",
@@ -25,16 +30,14 @@ export const getInnerStyles = (listHeight: number) => ({
   height: listHeight,
 });
 
-export const getItemWrapperStyle = (
- itemStyle: { top: number; height: number }
-) => ({
+export const getItemWrapperStyle = (itemStyle: { top: number; height: number }) => ({
   ...itemStyle,
   position: "absolute",
   width: "100%",
   left: 0,
 });
 
-export const getStartIndex = <T,>(
+export const getStartIndex = <T>(
   scrollTop: number,
   frameHeight: number,
   overScanCount: number,
@@ -58,7 +61,7 @@ export const getStartIndex = <T,>(
   return 0;
 };
 
-export const getEndIndex = <T,>(
+export const getEndIndex = <T>(
   scrollTop: number,
   frameHeight: number,
   overScanCount: number,
@@ -91,27 +94,40 @@ export const handleScroll: HandleScroll = (
   if (onScroll) {
     onScroll(scrollTop, scrollHeight);
   }
-}
+};
 
 export const throttledScrollHandler = rafThrottle(handleScroll);
 
-export const getVirtualListData = <T,>(data: T[], getItemHeight: GetItemHeight<T>) => data.reduce<VirtualListData>(
-  (acc, item, index) => {
-    if (index === 0) {
+export const getVirtualListData = <T>(data: T[], getItemHeight: GetItemHeight<T>) =>
+  data.reduce<VirtualListData>(
+    (acc, item, index) => {
+      if (index === 0) {
+        const itemHeight = getItemHeight(item, data);
+        acc.itemsStyles.push({ height: itemHeight, top: 0 });
+        acc.listHeight += itemHeight;
+        return acc;
+      }
+
+      const prevItem = acc.itemsStyles[index - 1];
       const itemHeight = getItemHeight(item, data);
-      acc.itemsStyles.push({ height: itemHeight, top: 0 });
+      acc.itemsStyles.push({
+        height: itemHeight,
+        top: prevItem.top + prevItem.height,
+      });
       acc.listHeight += itemHeight;
       return acc;
-    }
+    },
+    { itemsStyles: [], listHeight: 0 }
+  );
 
-    const prevItem = acc.itemsStyles[index - 1];
-    const itemHeight = getItemHeight(item, data);
-    acc.itemsStyles.push({
-      height: itemHeight,
-      top: prevItem.top + prevItem.height
-    });
-    acc.listHeight += itemHeight;
-    return acc;
-  },
-  { itemsStyles: [], listHeight: 0 }
-);
+export const getItemKey = (itemId: unknown) => {
+  if (typeof itemId === "string") {
+    return itemId;
+  }
+
+  if (typeof itemId === "number") {
+    return itemId.toString();
+  }
+
+  throw new Error("VirtualList: Item id should be string or number");
+};
